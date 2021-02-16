@@ -10,7 +10,7 @@ import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class Window {
 
-    private final String screenTitle;
+    private String screenTitle;
     private int width, height;
     private long windowHandle;
     private boolean resized, vSync;
@@ -61,11 +61,14 @@ public class Window {
         glfwMakeContextCurrent(windowHandle);
 
         if(isvSync()) glfwSwapInterval(1);
+        else glfwSwapInterval(0);
 
         glfwShowWindow(windowHandle);
 
         GL.createCapabilities();
         glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     }
@@ -89,6 +92,11 @@ public class Window {
 
     public String getScreenTitle() {
         return screenTitle;
+    }
+
+    public void setScreenTitle(String screenTitle) {
+        this.screenTitle = screenTitle;
+        glfwSetWindowTitle(windowHandle, screenTitle);
     }
 
     public int getWidth() {

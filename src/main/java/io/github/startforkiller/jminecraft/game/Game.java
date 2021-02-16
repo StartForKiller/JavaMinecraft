@@ -8,8 +8,6 @@ import org.joml.Vector2f;
 import org.joml.Vector3f;
 
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
 
 import static org.lwjgl.glfw.GLFW.*;
 
@@ -17,13 +15,11 @@ public class Game implements IGameLogic {
 
     private final Renderer renderer;
 
-    private TextureManager textureManager;
-
-    private BlockType grassBlock;
-    private GameItem grassBlockItem;
-
     private final Camera camera;
     private final Vector3f cameraInc;
+
+    private GameItem[] gameItems;
+    private World world;
 
     public Game() {
         renderer = new Renderer();
@@ -35,18 +31,10 @@ public class Game implements IGameLogic {
     public void init(Window window) throws Exception {
         renderer.init(window);
 
-        textureManager = new TextureManager(16, 16, 256);
+        this.world = new World();
 
-        grassBlock = new BlockType(textureManager, "grass", new HashMap<String, String>() {{
-            put("top", "grass");
-            put("bottom", "dirt");
-            put("sides", "grass_side");
-        }});
-
-        textureManager.generateMipMaps();
-
-        grassBlockItem = new GameItem(new Mesh(grassBlock.getVertexPositions(), grassBlock.getTexCoords(), grassBlock.getIndices(), EngineConstants.shadingValues));
-        grassBlockItem.setPosition(0, 0, -3.0f);
+        gameItems = new GameItem[] {
+        };
 
         window.setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     }
@@ -87,16 +75,17 @@ public class Game implements IGameLogic {
 
     @Override
     public void render(Window window) {
-        renderer.render(window, textureManager, new GameItem[]{
-                grassBlockItem
-        }, camera);
+        if(gameItems.length != 0)
+            renderer.render(window, world.getTextureManager() , gameItems, camera);
+
+        world.render(renderer, window, camera);
     }
 
     @Override
     public void cleanup() {
         renderer.cleanup();
 
-        grassBlockItem.getMesh().cleanup();
+        //TODO: world clear meshes
     }
 
 }

@@ -10,8 +10,15 @@ public class Engine implements Runnable {
 
     private final MouseInput mouseInput;
 
+    private double lastFps;
+    private int fps;
+
+    private String screenTitle;
+
     public Engine(String screenTitle, int width, int height, boolean vSync, IGameLogic gameLogic) throws Exception {
-        window = new Window(screenTitle, width, height, vSync);
+        this.screenTitle = screenTitle;
+
+        window = new Window(this.screenTitle, width, height, vSync);
         this.gameLogic = gameLogic;
         timer = new Timer();
         mouseInput = new MouseInput();
@@ -34,12 +41,14 @@ public class Engine implements Runnable {
         timer.init();
         mouseInput.init(window);
         gameLogic.init(window);
+        lastFps = timer.getTime();
+        fps = 0;
     }
 
     protected void gameLoop() {
-        float elapsedTime;
-        float accumulator = 0f;
-        float interval = 1f / EngineConstants.TARGET_UPS;
+        double elapsedTime;
+        double accumulator = 0f;
+        double interval = 1f / EngineConstants.TARGET_UPS;
 
         boolean running = true;
         while(running && !window.windowShouldClose()) {
@@ -49,7 +58,7 @@ public class Engine implements Runnable {
             input();
 
             while(accumulator >= interval) {
-                update(interval);
+                update((float)interval);
                 accumulator -= interval;
             }
 
@@ -60,7 +69,7 @@ public class Engine implements Runnable {
     }
 
     private void sync() {
-        float loopSlot = 1f / EngineConstants.TARGET_FPS;
+        double loopSlot = 1f / EngineConstants.TARGET_FPS;
         double endTime = timer.getLastTime() + loopSlot;
         while(timer.getTime() < endTime) {
             try {
@@ -81,6 +90,12 @@ public class Engine implements Runnable {
     }
 
     protected void render() {
+        if(timer.getLastTime() - lastFps > 1) {
+            lastFps = timer.getLastTime();
+            window.setScreenTitle(screenTitle + " - " + fps + " FPS");
+            fps = 0;
+        }
+        fps++;
         gameLogic.render(window);
         window.update();
     }

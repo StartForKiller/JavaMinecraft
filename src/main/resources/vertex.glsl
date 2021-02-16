@@ -7,11 +7,12 @@ layout (location = 2) in float shadingValues;
 out vec3 interpolatedTexCoords;
 out float interpolatedShadingValues;
 
-uniform mat4 modelViewMatrix;
+uniform mat4 modelMatrix;
+uniform mat4 viewMatrix;
 uniform mat4 projectionMatrix;
 
 void main() {
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
     interpolatedTexCoords = texCoords;
     interpolatedShadingValues = shadingValues;
 }

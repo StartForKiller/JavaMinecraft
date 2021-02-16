@@ -4,6 +4,9 @@ import io.github.startforkiller.jminecraft.engine.data.*;
 import io.github.startforkiller.jminecraft.engine.Utils;
 import io.github.startforkiller.jminecraft.engine.Window;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
+
+import java.util.Map;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.*;
@@ -28,7 +31,8 @@ public class Renderer {
 
         shaderProgram.createUniform("projectionMatrix");
 
-        shaderProgram.createUniform("modelViewMatrix");
+        shaderProgram.createUniform("modelMatrix");
+        shaderProgram.createUniform("viewMatrix");
         shaderProgram.createUniform("textureArraySampler");
     }
 
@@ -36,7 +40,7 @@ public class Renderer {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     }
 
-    public void render(Window window, TextureManager textureManager,  GameItem[] gameItems, Camera camera) {
+    private void renderCommonPart(Window window, TextureManager textureManager, Camera camera) {
         clear();
 
         if(window.isResized()) {
@@ -54,11 +58,30 @@ public class Renderer {
         shaderProgram.setUniform("textureArraySampler", 0);
 
         Matrix4f viewMatrix = transformation.getViewMatrix(camera);
-        for(GameItem gameItem : gameItems) {
-            Matrix4f modelViewMatrix = transformation.getModelViewMatrix(gameItem, viewMatrix);
+        shaderProgram.setUniform("viewMatrix", viewMatrix);
+    }
 
-            shaderProgram.setUniform("modelViewMatrix", modelViewMatrix);
+    public void render(Window window, TextureManager textureManager, GameItem[] gameItems, Camera camera) {
+        renderCommonPart(window, textureManager, camera);
+
+        for(GameItem gameItem : gameItems) {
+            Matrix4f modelMatrix = transformation.getModelMatrix(gameItem);
+
+            shaderProgram.setUniform("modelMatrix", modelMatrix);
             gameItem.getMesh().render();
+        }
+
+        shaderProgram.unbind();
+    }
+
+    public void render(Window window, TextureManager textureManager, Map<Vector3f, Chunk> chunks, Camera camera) {
+        renderCommonPart(window, textureManager, camera);
+
+        for(Chunk chunk : chunks.values()) {
+            Matrix4f modelMatrix = transformation.getModelMatrix(new Vector3f(chunk.chunkPosition).mul(15, 15, 15));
+
+            shaderProgram.setUniform("modelMatrix", modelMatrix);
+            chunk.render();
         }
 
         shaderProgram.unbind();
