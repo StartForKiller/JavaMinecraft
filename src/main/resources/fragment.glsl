@@ -7,5 +7,10 @@ out vec4 fragColor;
 uniform sampler2DArray textureArraySampler;
 
 void main() {
-    fragColor = texture(textureArraySampler, interpolatedTexCoords) * interpolatedShadingValues;
+    vec4 textureColour = texture(textureArraySampler, interpolatedTexCoords);
+    fragColor = textureColour * interpolatedShadingValues;
+
+    if(textureColour.a == 0.0) {
+        discard;
+    }
 }

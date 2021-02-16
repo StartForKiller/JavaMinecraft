@@ -13,6 +13,7 @@ public class Chunk extends Mesh {
     private LinkedList<Float> shadingValues = null;
 
     public final Vector3f chunkPosition;
+    public final Vector3f realPosition;
 
     private int meshIndexCounter = 0;
 
@@ -24,6 +25,7 @@ public class Chunk extends Mesh {
 
         this.world = world;
         this.chunkPosition = chunkPosition;
+        this.realPosition = new Vector3f(chunkPosition).mul(16);
         this.blocks = new int[16][16][16];
     }
 
@@ -54,6 +56,16 @@ public class Chunk extends Mesh {
         for (int i = 0; i < shadingVals.length; i++) this.shadingValues.add(i, shadingVals[i]);
     }
 
+    public int getBlock(int x, int y, int z) {
+        int blockTypeID = this.blocks[x][y][z];
+
+        if(blockTypeID == 0) return 0;
+
+        BlockType blockType = world.blockTypes.get(blockTypeID);
+        if(blockType.isTransparent()) return 0;
+        else return blockTypeID;
+    }
+
     public void updateMesh() {
         this.positions = new LinkedList<>();
         this.texCoords = new LinkedList<>();
@@ -70,45 +82,45 @@ public class Chunk extends Mesh {
                     if(blockNumber > 0) {
                         BlockType blockType = this.world.blockTypes.get(blockNumber);
 
-                        float x = this.chunkPosition.x + localX;
-                        float y = this.chunkPosition.y + localY;
-                        float z = this.chunkPosition.z + localZ;
+                        float x = this.realPosition.x + localX;
+                        float y = this.realPosition.y + localY;
+                        float z = this.realPosition.z + localZ;
 
                         if(blockType.isCube()) {
                             if (localX == 0) {
-                                if (this.blocks[localX + 1][localY][localZ] == 0) addFace(0, blockType, x, y, z);
+                                if (getBlock(localX + 1, localY, localZ) == 0) addFace(0, blockType, x, y, z);
                                 if (this.world.getBlockNumber(x - 1, y, z) == 0) addFace(1, blockType, x, y, z);
                             } else {
                                 if (localX == 15) {
                                     if (this.world.getBlockNumber(x + 1, y, z) == 0) addFace(0, blockType, x, y, z);
                                 } else {
-                                    if (this.blocks[localX + 1][localY][localZ] == 0) addFace(0, blockType, x, y, z);
+                                    if (getBlock(localX + 1, localY, localZ) == 0) addFace(0, blockType, x, y, z);
                                 }
-                                if (this.blocks[localX - 1][localY][localZ] == 0) addFace(1, blockType, x, y, z);
+                                if (getBlock(localX - 1, localY, localZ) == 0) addFace(1, blockType, x, y, z);
                             }
 
                             if (localY == 0) {
-                                if (this.blocks[localX][localY + 1][localZ] == 0) addFace(2, blockType, x, y, z);
+                                if (getBlock(localX, localY + 1, localZ) == 0) addFace(2, blockType, x, y, z);
                                 if (this.world.getBlockNumber(x, y - 1, z) == 0) addFace(3, blockType, x, y, z);
                             } else {
                                 if (localY == 15) {
                                     if (this.world.getBlockNumber(x, y + 1, z) == 0) addFace(2, blockType, x, y, z);
                                 } else {
-                                    if (this.blocks[localX][localY + 1][localZ] == 0) addFace(2, blockType, x, y, z);
+                                    if (getBlock(localX, localY + 1, localZ) == 0) addFace(2, blockType, x, y, z);
                                 }
-                                if (this.blocks[localX][localY - 1][localZ] == 0) addFace(3, blockType, x, y, z);
+                                if (getBlock(localX, localY - 1, localZ) == 0) addFace(3, blockType, x, y, z);
                             }
 
                             if (localZ == 0) {
-                                if (this.blocks[localX][localY][localZ + 1] == 0) addFace(4, blockType, x, y, z);
+                                if (getBlock(localX, localY, localZ + 1) == 0) addFace(4, blockType, x, y, z);
                                 if (this.world.getBlockNumber(x, y, z - 1) == 0) addFace(5, blockType, x, y, z);
                             } else {
                                 if (localZ == 15) {
                                     if (this.world.getBlockNumber(x, y, z + 1) == 0) addFace(4, blockType, x, y, z);
                                 } else {
-                                    if (this.blocks[localX][localY][localZ + 1] == 0) addFace(4, blockType, x, y, z);
+                                    if (getBlock(localX, localY, localZ + 1) == 0) addFace(4, blockType, x, y, z);
                                 }
-                                if (this.blocks[localX][localY][localZ - 1] == 0) addFace(5, blockType, x, y, z);
+                                if (getBlock(localX, localY, localZ - 1) == 0) addFace(5, blockType, x, y, z);
                             }
                         } else {
                             for(int i = 0; i < blockType.getVertexPositions().length; i++) {

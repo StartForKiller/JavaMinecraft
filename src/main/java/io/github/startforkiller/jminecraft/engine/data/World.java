@@ -1,6 +1,8 @@
 package io.github.startforkiller.jminecraft.engine.data;
 
+import io.github.startforkiller.jminecraft.engine.Timer;
 import io.github.startforkiller.jminecraft.engine.Window;
+import io.github.startforkiller.jminecraft.engine.data.models.CactusModel;
 import io.github.startforkiller.jminecraft.engine.data.models.CubeModel;
 import io.github.startforkiller.jminecraft.engine.data.models.PlantModel;
 import io.github.startforkiller.jminecraft.game.Renderer;
@@ -57,14 +59,24 @@ public class World {
         blockTypes.add(new BlockType(textureManager, "rose", new HashMap<String, String>() {{
             put("all", "rose");
         }}, new PlantModel()));
+        blockTypes.add(new BlockType(textureManager, "cactus", new HashMap<String, String>() {{
+            put("top", "cactus_top");
+            put("bottom", "cactus_bottom");
+            put("sides", "cactus_side");
+        }}, new CactusModel()));
+        blockTypes.add(new BlockType(textureManager, "dead_bush", new HashMap<String, String>() {{
+            put("all", "dead_bush");
+        }}, new PlantModel()));
 
         textureManager.generateMipMaps();
 
-        int[] firstRnd = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 10};
-        int[] secondRnd = {0, 3};
-        int[] thirdRnd = {0, 0, 1};
+        int[] firstRnd = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 12, 12, 11};
+        int[] secondRnd = {0, 6};
+        int[] thirdRnd = {0, 0, 5};
         Random random = new Random();
 
+        Timer timer = new Timer();
+        timer.init();
         for(int x = 0; x < 8; x++) {
             for(int z = 0; z < 8; z++) {
                 Chunk currentChunk = new Chunk(this, new Vector3f(x - 4, -1, z - 4));
@@ -75,34 +87,30 @@ public class World {
                             if(j == 15) currentChunk.blocks[i][j][k] = firstRnd[random.nextInt(firstRnd.length)];
                             else if(j > 12) currentChunk.blocks[i][j][k] = secondRnd[random.nextInt(secondRnd.length)];
                             else currentChunk.blocks[i][j][k] = thirdRnd[random.nextInt(thirdRnd.length)];
+                            //currentChunk.blocks[i][j][k] = 1;
                         }
                     }
                 }
-                currentChunk.updateMesh();
 
                 chunks.put(currentChunk.chunkPosition, currentChunk);
             }
         }
 
-        /*chunks.put(new Vector3f(0, 0, 0), new Chunk(this, new Vector3f(0, 0, 0)));
-        Chunk chunk = chunks.get(new Vector3f(0, 0, 0));
-        for(int x = 0; x < 16; x++) {
-            for(int y = 0; y < 16; y++) {
-                for(int z = 0; z < 16; z++) {
-                    chunk.blocks[x][y][z] = 1;
-                }
-            }
-        }*/
+        for(Chunk chunk : chunks.values()) {
+            chunk.updateMesh();
+        }
 
-        //chunk.updateMesh();
+        System.out.println(timer.getElapsedTime());
     }
 
     public int getBlockNumber(float x, float y, float z) {
         Vector3f chunkPosition = new Vector3f((float)Math.floor(x / 16), (float)Math.floor(y / 16), (float)Math.floor(z / 16));
 
-        if(chunks.get(chunkPosition) == null) return 0;
+        if(chunks.get(chunkPosition) == null) {
+            return 0;
+        }
 
-        return chunks.get(chunkPosition).blocks[(int)(getUnsignedInt((int)x) % 16)][(int)(getUnsignedInt((int)y) % 16)][(int)(getUnsignedInt((int)z) % 16)];
+        return chunks.get(chunkPosition).getBlock((int)(getUnsignedInt((int)x) % 16), (int)(getUnsignedInt((int)y) % 16), (int)(getUnsignedInt((int)z) % 16));
     }
 
     public void render(Renderer renderer, Window window, Camera camera) {

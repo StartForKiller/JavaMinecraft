@@ -74,13 +74,13 @@ public class Renderer {
         shaderProgram.unbind();
     }
 
+    public final static Matrix4f identityMatrix = new Matrix4f().identity();
+
     public void render(Window window, TextureManager textureManager, Map<Vector3f, Chunk> chunks, Camera camera) {
         renderCommonPart(window, textureManager, camera);
 
         for(Chunk chunk : chunks.values()) {
-            Matrix4f modelMatrix = transformation.getModelMatrix(new Vector3f(chunk.chunkPosition).mul(15, 15, 15));
-
-            shaderProgram.setUniform("modelMatrix", modelMatrix);
+            shaderProgram.setUniform("modelMatrix", identityMatrix);
             chunk.render();
         }
 

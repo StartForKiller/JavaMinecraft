@@ -5,7 +5,7 @@ import io.github.startforkiller.jminecraft.engine.data.EngineConstants;
 public class Engine implements Runnable {
 
     private final Window window;
-    private final Timer timer;
+    public final Timer timer;
     private final IGameLogic gameLogic;
 
     private final MouseInput mouseInput;
