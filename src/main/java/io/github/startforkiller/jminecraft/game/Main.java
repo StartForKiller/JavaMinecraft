@@ -9,7 +9,7 @@ public class Main {
         try {
             boolean vSync = true;
             IGameLogic gameLogic = new Game();
-            Engine game = new Engine("JMinecraft", 1024, 768, vSync, gameLogic);
+            Engine game = new Engine("Minecraft", 1024, 768, vSync, gameLogic);
             game.run();
         } catch (Exception e) {
             e.printStackTrace();
