@@ -12,11 +12,13 @@ public class MouseInput {
     private final Vector2f displVec;
 
     private boolean inWindow = false;
+
     private boolean leftButtonPressed = false;
+    private boolean middleButtonPressed = false;
     private boolean rightButtonPressed = false;
 
     public MouseInput() {
-        previousPos = new Vector2d(-1, -1);
+        previousPos = new Vector2d(0, 0);
         currentPos = new Vector2d(0, 0);
         displVec = new Vector2f();
     }
@@ -30,8 +32,9 @@ public class MouseInput {
             inWindow = entered;
         });
         glfwSetMouseButtonCallback(window.getWindowHandle(), (windowHandle, button, action, mode) -> {
-            leftButtonPressed = button == GLFW_MOUSE_BUTTON_1 && action == GLFW_PRESS;
-            rightButtonPressed = button == GLFW_MOUSE_BUTTON_2 && action == GLFW_PRESS;
+            leftButtonPressed = button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS;
+            rightButtonPressed = button == GLFW_MOUSE_BUTTON_RIGHT && action == GLFW_PRESS;
+            middleButtonPressed = button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS;
         });
     }
 
@@ -47,11 +50,11 @@ public class MouseInput {
             double deltay = currentPos.y - previousPos.y;
             boolean rotateX = deltax != 0;
             boolean rotateY = deltay != 0;
-            if (rotateX) {
-                displVec.y = (float) deltax;
-            }
             if (rotateY) {
-                displVec.x = (float) deltay;
+                displVec.y = (float) -deltay;
+            }
+            if (rotateX) {
+                displVec.x = (float) deltax;
             }
         }
         previousPos.x = currentPos.x;
@@ -61,9 +64,21 @@ public class MouseInput {
     public boolean isLeftButtonPressed() {
         return leftButtonPressed;
     }
-
+    public boolean isMiddleButtonPressed() {
+        return middleButtonPressed;
+    }
     public boolean isRightButtonPressed() {
         return rightButtonPressed;
+    }
+
+    public void flushLeft() {
+        leftButtonPressed = false;
+    }
+    public void flushMiddle() {
+        middleButtonPressed = false;
+    }
+    public void flushRight() {
+        rightButtonPressed = false;
     }
 
 }

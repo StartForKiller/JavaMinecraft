@@ -10,6 +10,6 @@ public class EngineConstants {
     public static final float Z_FAR = 1000.f;
 
     public static final float CAMERA_POS_STEP = 0.1f;
-    public static final float MOUSE_SENSITIVITY = 0.4f;
+    public static final float MOUSE_SENSITIVITY = 0.008f;
 
 }

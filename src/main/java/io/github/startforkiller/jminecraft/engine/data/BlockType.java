@@ -15,6 +15,8 @@ public class BlockType {
 
     private DataModel model;
 
+    boolean hasLight;
+
     private static final String[] staticFaces = new String[] {
             "right", "left", "top", "bottom", "front", "back"
     };
@@ -29,8 +31,13 @@ public class BlockType {
     }
 
     public BlockType(TextureManager textureManager, String name, Map<String, String> blockFacesTextures, DataModel model) {
+        this(textureManager, name, blockFacesTextures, model, false);
+    }
+
+    public BlockType(TextureManager textureManager, String name, Map<String, String> blockFacesTextures, DataModel model, boolean hasLight) {
         this.name = name;
         this.model = model;
+        this.hasLight = hasLight;
 
         vertexPositions = model.getVertexPositions();
         texCoords = model.getTexCoords().clone();
@@ -96,6 +103,10 @@ public class BlockType {
 
     public boolean isCube() {
         return model.isCube();
+    }
+
+    public boolean hasLight() {
+        return hasLight;
     }
 
 }

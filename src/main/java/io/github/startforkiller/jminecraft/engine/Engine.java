@@ -86,7 +86,7 @@ public class Engine implements Runnable {
     }
 
     protected void update(float delta) {
-        gameLogic.update(delta ,mouseInput);
+        gameLogic.update(delta ,mouseInput, window);
     }
 
     protected void render() {

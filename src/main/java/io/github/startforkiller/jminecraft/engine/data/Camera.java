@@ -7,9 +7,11 @@ public class Camera {
     private final Vector3f position;
     private final Vector3f rotation;
 
+    public static final double TAU = 6.28318530717958647692;
+
     public Camera() {
         position = new Vector3f(0, 0, 0);
-        rotation = new Vector3f(0, 0, 0);
+        rotation = new Vector3f((float)(-TAU / 4), 0, 0);
     }
 
     public Camera(Vector3f position, Vector3f rotation) {
@@ -27,16 +29,14 @@ public class Camera {
         position.z = z;
     }
 
-    public void movePosition(float offsetX, float offsetY, float offsetZ) {
-        if(offsetZ != 0 ) {
-            position.x += (float)Math.sin(Math.toRadians(rotation.y)) * -1.0f * offsetZ;
-            position.z += (float)Math.cos(Math.toRadians(rotation.y)) * offsetZ;
+    public void movePosition(float offsetX, float offsetY, float offsetZ, float doubleSpeed) {
+        float angle = (float)(rotation.x - Math.atan2(offsetZ, offsetX) + (TAU / 4));
+        if(offsetX != 0.0f || offsetZ != 0.0f) {
+            position.x += (float) Math.cos(angle) * doubleSpeed * EngineConstants.CAMERA_POS_STEP;
+            position.z += (float) Math.sin(angle) * doubleSpeed * EngineConstants.CAMERA_POS_STEP;
         }
-        if(offsetX != 0) {
-            position.x += (float)Math.sin(Math.toRadians(rotation.y - 90)) * -1.0f * offsetX;
-            position.z += (float)Math.cos(Math.toRadians(rotation.y - 90)) * offsetX;
-        }
-        position.y += offsetY;
+
+        position.y += offsetY * EngineConstants.CAMERA_POS_STEP;
     }
 
     public Vector3f getRotation() {
@@ -53,6 +53,8 @@ public class Camera {
         rotation.x += offsetX;
         rotation.y += offsetY;
         rotation.z += offsetZ;
+
+        rotation.y = Math.max((float)(-TAU / 4), Math.min((float)(TAU / 4), rotation.y));
     }
 
 }

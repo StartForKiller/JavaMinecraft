@@ -17,14 +17,21 @@ public class Game implements IGameLogic {
 
     private final Camera camera;
     private final Vector3f cameraInc;
+    private boolean doubleSpeed = false;
 
     private GameItem[] gameItems;
-    private World world;
+    public World world;
+
+    public static Game instance;
+    public MouseInput mouseInput;
+    public boolean activeMouse = false;
 
     public Game() {
         renderer = new Renderer();
         camera = new Camera();
         cameraInc = new Vector3f();
+
+        instance = this;
     }
 
     @Override
@@ -43,9 +50,9 @@ public class Game implements IGameLogic {
     public void input(Window window, MouseInput mouseInput) {
         cameraInc.set(0, 0, 0);
         if (window.isKeyPressed(GLFW_KEY_W)) {
-            cameraInc.z = -1;
-        } else if (window.isKeyPressed(GLFW_KEY_S)) {
             cameraInc.z = 1;
+        } else if (window.isKeyPressed(GLFW_KEY_S)) {
+            cameraInc.z = -1;
         }
         if (window.isKeyPressed(GLFW_KEY_A)) {
             cameraInc.x = -1;
@@ -57,19 +64,57 @@ public class Game implements IGameLogic {
         } else if (window.isKeyPressed(GLFW_KEY_SPACE)) {
             cameraInc.y = 1;
         }
+        if(window.isKeyPressed(GLFW_KEY_LEFT_CONTROL)) {
+            doubleSpeed = true;
+        }
+    }
+
+    static boolean lastClicked = false;
+    static int currentBlock = 7;
+
+    public static Integer HitCallback(Vector3f[] blocks) {
+        if(instance.mouseInput.isLeftButtonPressed()) {
+            instance.mouseInput.flushLeft(); // To force the user to click multiple times for multiple blocks
+
+            instance.world.SetBlock(blocks[0], currentBlock);
+        } else if(instance.mouseInput.isRightButtonPressed()) {
+            instance.mouseInput.flushRight(); // To force the user to click multiple times for multiple blocks
+
+            instance.world.SetBlock(blocks[1], 0);
+        } else if(instance.mouseInput.isMiddleButtonPressed()) {
+            instance.mouseInput.flushMiddle(); // To force the user to click multiple times for multiple blocks
+
+            currentBlock = instance.world.getBlockNumber(blocks[1].x, blocks[1].y, blocks[1].z);
+        }
+
+        return 0;
     }
 
     @Override
-    public void update(float delta, MouseInput mouseInput) {
-        camera.movePosition(cameraInc.x * EngineConstants.CAMERA_POS_STEP,
-                cameraInc.y * EngineConstants.CAMERA_POS_STEP,
-                cameraInc.z * EngineConstants.CAMERA_POS_STEP);
+    public void update(float delta, MouseInput mouseInput, Window window) {
+        this.mouseInput = mouseInput;
 
-        if(mouseInput.isRightButtonPressed()) {
+        camera.movePosition(cameraInc.x,
+                cameraInc.y,
+                cameraInc.z, doubleSpeed ? 2.0f : 1.0f);
+
+        if(!activeMouse && (mouseInput.isRightButtonPressed() || mouseInput.isLeftButtonPressed())) {
+            activeMouse = true;
+        } else if(activeMouse) {
+            glfwSetInputMode(window.getWindowHandle(), GLFW_CURSOR, GLFW_CURSOR_HIDDEN);
             Vector2f rotVec = mouseInput.getDisplVec();
             camera.moveRotation(rotVec.x * EngineConstants.MOUSE_SENSITIVITY,
                     rotVec.y * EngineConstants.MOUSE_SENSITIVITY,
                     0);
+
+            HitRay hitRay = new HitRay(new Vector3f(camera.getRotation()), new Vector3f(camera.getPosition()), world);
+
+            while (hitRay.currDistance < hitRay.HIT_RANGE) {
+                if (hitRay.step(Game::HitCallback)) break;
+            }
+
+            if(!instance.mouseInput.isLeftButtonPressed())
+                lastClicked = false;
         }
     }
 
