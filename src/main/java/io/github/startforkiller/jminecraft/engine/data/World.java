@@ -22,6 +22,10 @@ public class World {
     }
 
     Queue<BFSLightNode> bfsLightNodeQueue = new LinkedList<>();
+    Queue<BFSLightRemovalNode> bfsLightRemovalNodeQueue = new LinkedList<>();
+
+    Queue<BFSLightNode> bfsSkyLightNodeQueue = new LinkedList<>();
+    Queue<BFSLightRemovalNode> bfsSkyLightRemovalNodeQueue = new LinkedList<>();
 
     public World() {
         textureManager = new TextureManager(16, 16, 256);
@@ -49,7 +53,7 @@ public class World {
         }}, new CubeModel()));
         blockTypes.add(new BlockType(textureManager, "planks", new HashMap<String, String>() {{
             put("all", "planks");
-        }}, new CubeModel(), true));
+        }}, new CubeModel()));
         blockTypes.add(new BlockType(textureManager, "log", new HashMap<String, String>() {{
             put("top", "log_top");
             put("bottom", "log_top");
@@ -69,6 +73,9 @@ public class World {
         blockTypes.add(new BlockType(textureManager, "dead_bush", new HashMap<String, String>() {{
             put("all", "dead_bush");
         }}, new PlantModel()));
+        blockTypes.add(new BlockType(textureManager, "lamp", new HashMap<String, String>() {{
+            put("all", "lamp");
+        }}, new CubeModel(), true));
 
         textureManager.generateMipMaps();
 
@@ -155,7 +162,8 @@ public class World {
             currentChunk = chunks.get(chunkPosition);
         }
 
-        if(getBlockNumber(position.x, position.y, position.z) == number) return;
+        int lastBlockNumber = getBlockNumber(position.x, position.y, position.z);
+        if(lastBlockNumber == number) return;
 
         Vector3f localPosition = getLocalPosition(position);
         int lx = (int) localPosition.x;
@@ -177,8 +185,18 @@ public class World {
         if(lz == (Chunk.CHUNK_LENGTH - 1)) tryUpdateChunkMesh(new Vector3f(cx, cy, cz + 1));
         if(lz == 0) tryUpdateChunkMesh(new Vector3f(cx, cy, cz - 1));
 
+        boolean propagateLightIfNotPropagated = false;
+        if(lastBlockNumber != 0 && blockTypes.get(lastBlockNumber).hasLight()) {
+            bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(lx, ly, lz, currentChunk.getBlocklight(lx, ly, lz), currentChunk));
+            currentChunk.setBlocklight(lx, ly, lz, (byte) 0);
+
+            updateBlockRemovalLights(currentChunk);
+
+            propagateLightIfNotPropagated = true;
+        }
+
         //Update lighting
-        if(blockTypes.get(number) == null) { //We broke a block :D
+        if(blockTypes.get(number) == null && !propagateLightIfNotPropagated) { //We broke a block :D calculate skylight too
             int currentLight = 0;
             currentLight = (getBlockNumber(position.x + 1, position.y, position.z) == 0 && (currentLight < currentChunk.getBlocklight(lx + 1, ly, lz))) ? currentChunk.getBlocklight(lx + 1, ly, lz) : currentLight;
             currentLight = (getBlockNumber(position.x - 1, position.y, position.z) == 0 && (currentLight < currentChunk.getBlocklight(lx - 1, ly, lz))) ? currentChunk.getBlocklight(lx - 1, ly, lz) : currentLight;
@@ -188,24 +206,35 @@ public class World {
             currentLight = (getBlockNumber(position.x, position.y, position.z - 1) == 0 && (currentLight < currentChunk.getBlocklight(lx, ly, lz - 1))) ? currentChunk.getBlocklight(lx, ly, lz - 1) : currentLight;
 
             if(currentLight > 0) {
-                System.out.println("asa " + currentLight);
                 currentChunk.setBlocklight(lx, ly, lz, (byte)(currentLight - 1));
                 bfsLightNodeQueue.add(new BFSLightNode(lx, ly, lz, currentChunk));
 
-                updateBlockLights();
-
+                updateBlockLights(currentChunk);
                 updateRemovedBlocksAdjacentChunksBlockLights(lx, ly, lz, currentChunk.chunkPosition);
+                propagateLightIfNotPropagated = false;
             }
         }
-        else if(blockTypes.get(number).hasLight()) {
+        else if(blockTypes.get(number) != null && blockTypes.get(number).hasLight()) {
             //Recalculate block lighting
 
             currentChunk.setBlocklight(lx, ly, lz, (byte) 15); //act like torches for now
             bfsLightNodeQueue.add(new BFSLightNode(lx, ly, lz, currentChunk));
 
-            updateBlockLights();
+            propagateLightIfNotPropagated = false;
 
-            updateRemovedBlocksAdjacentChunksBlockLights(lx, ly, lz, currentChunk.chunkPosition);
+            updateBlockLights(currentChunk);
+        } else if(blockTypes.get(number) != null) {
+            bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(lx, ly, lz, currentChunk.getBlocklight(lx, ly, lz), currentChunk));
+            currentChunk.setBlocklight(lx, ly, lz, (byte) 0);
+
+            updateBlockRemovalLights(currentChunk);
+            updateBlockLights(currentChunk);
+
+            propagateLightIfNotPropagated = false;
+        }
+
+        if(propagateLightIfNotPropagated) {
+            updateBlockLights(currentChunk);
         }
 
         currentChunk.updateMesh();
@@ -284,7 +313,7 @@ public class World {
         public Chunk chunk;
     }
 
-    void updateBlockLights() {
+    void updateBlockLights(Chunk updatingChunk) {
         Set<Chunk> affectedChunks = new LinkedHashSet<>();
 
         while(!bfsLightNodeQueue.isEmpty()) {
@@ -312,6 +341,7 @@ public class World {
                     currentNode.chunk.setBlocklight(lx - 1, ly, lz, (byte) (lightLevel - 1));
 
                     bfsLightNodeQueue.add(new BFSLightNode(lx - 1, ly, lz, currentNode.chunk));
+                    affectedChunks.add(currentNode.chunk);
                 }
             }
             if((ly - 1) < 0 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, -1, 0)) != null) { //Edge: check another chunk
@@ -331,6 +361,7 @@ public class World {
                     currentNode.chunk.setBlocklight(lx, ly - 1, lz, (byte) (lightLevel - 1));
 
                     bfsLightNodeQueue.add(new BFSLightNode(lx, ly - 1, lz, currentNode.chunk));
+                    affectedChunks.add(currentNode.chunk);
                 }
             }
             if((lz - 1) < 0 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 0, -1)) != null) { //Edge: check another chunk
@@ -350,6 +381,7 @@ public class World {
                     currentNode.chunk.setBlocklight(lx, ly, lz - 1, (byte) (lightLevel - 1));
 
                     bfsLightNodeQueue.add(new BFSLightNode(lx, ly, lz - 1, currentNode.chunk));
+                    affectedChunks.add(currentNode.chunk);
                 }
             }
             if((lx + 1) > 15 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(+1, 0, 0)) != null) { //Edge: check another chunk
@@ -369,10 +401,15 @@ public class World {
                     currentNode.chunk.setBlocklight(lx + 1, ly, lz, (byte) (lightLevel - 1));
 
                     bfsLightNodeQueue.add(new BFSLightNode(lx + 1, ly, lz, currentNode.chunk));
+                    affectedChunks.add(currentNode.chunk);
                 }
             }
-            if((ly + 1) > 15 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 1, 0)) != null) { //Edge: check another chunk
-                Chunk currChunk = chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 1, 0));
+            if((ly + 1) > 15) { //Edge: check another chunk
+                Vector3f chunkPosTemp = new Vector3f(currentNode.chunk.chunkPosition).add(0, 1, 0);
+                if(chunks.get(chunkPosTemp) == null) {
+                    chunks.put(chunkPosTemp, new Chunk(this, chunkPosTemp));
+                }
+                Chunk currChunk = chunks.get(chunkPosTemp);
                 if(blockIsTransparentOrAir(lx, 0, lz, currChunk) && (currChunk.getBlocklight(lx, 0, lz) + 2) <= lightLevel) {
                     //Propagate
 
@@ -388,6 +425,7 @@ public class World {
                     currentNode.chunk.setBlocklight(lx, ly + 1, lz, (byte) (lightLevel - 1));
 
                     bfsLightNodeQueue.add(new BFSLightNode(lx, ly + 1, lz, currentNode.chunk));
+                    affectedChunks.add(currentNode.chunk);
                 }
             }
             if((lz + 1) > 15 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 0, 1)) != null) { //Edge: check another chunk
@@ -407,12 +445,13 @@ public class World {
                     currentNode.chunk.setBlocklight(lx, ly, lz + 1, (byte) (lightLevel - 1));
 
                     bfsLightNodeQueue.add(new BFSLightNode(lx, ly, lz + 1, currentNode.chunk));
+                    affectedChunks.add(currentNode.chunk);
                 }
             }
         }
 
         for(Chunk affectedChunk : affectedChunks) {
-            affectedChunk.updateMesh();
+            if(!updatingChunk.equals(affectedChunk)) affectedChunk.updateMesh();
         }
         affectedChunks.clear();
     }
@@ -442,4 +481,297 @@ public class World {
 
         affectedChunks.clear();
     }
+
+    class BFSLightRemovalNode {
+        BFSLightRemovalNode(int x, int y, int z, int value, Chunk chunk) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.value = value;
+            this.chunk = chunk;
+        }
+
+        public int x;
+        public int y;
+        public int z;
+        public int value;
+        public Chunk chunk;
+    }
+
+    void updateBlockRemovalLights(Chunk updatingChunk) {
+        Set<Chunk> affectedChunks = new LinkedHashSet<>();
+
+        while(!bfsLightRemovalNodeQueue.isEmpty()) {
+            BFSLightRemovalNode currentNode = bfsLightRemovalNodeQueue.poll();
+
+            int lx = currentNode.x;
+            int ly = currentNode.y;
+            int lz = currentNode.z;
+
+            if((lx - 1) < 0 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(-1, 0, 0)) != null) { //Edge: check another chunk
+                Chunk currChunk = chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(-1, 0, 0));
+                int neightbourLevel = currChunk.getBlocklight(15, ly, lz);
+                if(neightbourLevel != 0 && neightbourLevel < currentNode.value) {
+                    currChunk.setBlocklight(15, ly, lz, (byte) 0);
+
+                    bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(15, ly, lz, neightbourLevel, currChunk));
+                    affectedChunks.add(currChunk);
+                } else if(neightbourLevel >= currentNode.value) {
+                    bfsLightNodeQueue.add(new BFSLightNode(15, ly, lz, currChunk));
+                }
+            } else if((lx - 1) >= 0) {
+                int neightbourLevel = currentNode.chunk.getBlocklight(lx - 1, ly, lz);
+                if(neightbourLevel != 0 && neightbourLevel < currentNode.value) {
+                    currentNode.chunk.setBlocklight(lx - 1, ly, lz, (byte) 0);
+
+                    bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(lx - 1, ly, lz, neightbourLevel, currentNode.chunk));
+                    affectedChunks.add(currentNode.chunk);
+                } else if(neightbourLevel >= currentNode.value) {
+                    bfsLightNodeQueue.add(new BFSLightNode(lx - 1, ly, lz, currentNode.chunk));
+                }
+            }
+            if((ly - 1) < 0 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, -1, 0)) != null) { //Edge: check another chunk
+                Chunk currChunk = chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, -1, 0));
+                int neightbourLevel = currChunk.getBlocklight(lx, 15, lz);
+                if(neightbourLevel != 0 && neightbourLevel < currentNode.value) {
+                    currChunk.setBlocklight(lx, 15, lz, (byte) 0);
+
+                    bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(lx, 15, lz, neightbourLevel, currChunk));
+                    affectedChunks.add(currChunk);
+                } else if(neightbourLevel >= currentNode.value) {
+                    bfsLightNodeQueue.add(new BFSLightNode(lx, 15, lz, currChunk));
+                }
+            } else if((ly - 1) >= 0) {
+                int neightbourLevel = currentNode.chunk.getBlocklight(lx, ly - 1, lz);
+                if(neightbourLevel != 0 && neightbourLevel < currentNode.value) {
+                    currentNode.chunk.setBlocklight(lx, ly - 1, lz, (byte) 0);
+
+                    bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(lx, ly - 1, lz, neightbourLevel, currentNode.chunk));
+                    affectedChunks.add(currentNode.chunk);
+                } else if(neightbourLevel >= currentNode.value) {
+                    bfsLightNodeQueue.add(new BFSLightNode(lx, ly - 1, lz, currentNode.chunk));
+                }
+            }
+            if((lz - 1) < 0 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 0, -1)) != null) { //Edge: check another chunk
+                Chunk currChunk = chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 0, -1));
+                int neightbourLevel = currChunk.getBlocklight(lx, ly, 15);
+                if(neightbourLevel != 0 && neightbourLevel < currentNode.value) {
+                    currChunk.setBlocklight(lx, ly, 15, (byte) 0);
+
+                    bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(lx, ly, 15, neightbourLevel, currChunk));
+                    affectedChunks.add(currChunk);
+                } else if(neightbourLevel >= currentNode.value) {
+                    bfsLightNodeQueue.add(new BFSLightNode(lx, ly, 15, currChunk));
+                }
+            } else if((lz - 1) >= 0) {
+                int neightbourLevel = currentNode.chunk.getBlocklight(lx , ly, lz - 1);
+                if(neightbourLevel != 0 && neightbourLevel < currentNode.value) {
+                    currentNode.chunk.setBlocklight(lx, ly, lz - 1, (byte) 0);
+
+                    bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(lx, ly, lz - 1, neightbourLevel, currentNode.chunk));
+                    affectedChunks.add(currentNode.chunk);
+                } else if(neightbourLevel >= currentNode.value) {
+                    bfsLightNodeQueue.add(new BFSLightNode(lx, ly, lz - 1, currentNode.chunk));
+                }
+            }
+            if((lx + 1) > 15 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(+1, 0, 0)) != null) { //Edge: check another chunk
+                Chunk currChunk = chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(+1, 0, 0));
+                int neightbourLevel = currChunk.getBlocklight(0, ly, lz);
+                if(neightbourLevel != 0 && neightbourLevel < currentNode.value) {
+                    currChunk.setBlocklight(0, ly, lz, (byte) 0);
+
+                    bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(0, ly, lz, neightbourLevel, currChunk));
+                    affectedChunks.add(currChunk);
+                } else if(neightbourLevel >= currentNode.value) {
+                    bfsLightNodeQueue.add(new BFSLightNode(0, ly, lz, currChunk));
+                }
+            } else if((lx + 1) < 16) {
+                int neightbourLevel = currentNode.chunk.getBlocklight(lx + 1, ly, lz);
+                if(neightbourLevel != 0 && neightbourLevel < currentNode.value) {
+                    currentNode.chunk.setBlocklight(lx + 1, ly, lz, (byte) 0);
+
+                    bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(lx + 1, ly, lz, neightbourLevel, currentNode.chunk));
+                    affectedChunks.add(currentNode.chunk);
+                } else if(neightbourLevel >= currentNode.value) {
+                    bfsLightNodeQueue.add(new BFSLightNode(lx + 1, ly, lz, currentNode.chunk));
+                }
+            }
+            if((ly + 1) > 15 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 1, 0)) != null) { //Edge: check another chunk
+                Chunk currChunk = chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 1, 0));
+                int neightbourLevel = currChunk.getBlocklight(lx, 0, lz);
+                if(neightbourLevel != 0 && neightbourLevel < currentNode.value) {
+                    currChunk.setBlocklight(lx, 0, lz, (byte) 0);
+
+                    bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(lx, 0, lz, neightbourLevel, currChunk));
+                    affectedChunks.add(currChunk);
+                } else if(neightbourLevel >= currentNode.value) {
+                    bfsLightNodeQueue.add(new BFSLightNode(lx, 0, lz, currChunk));
+                }
+            } else if((ly + 1) < 16) {
+                int neightbourLevel = currentNode.chunk.getBlocklight(lx , ly + 1, lz);
+                if(neightbourLevel != 0 && neightbourLevel < currentNode.value) {
+                    currentNode.chunk.setBlocklight(lx, ly + 1, lz, (byte) 0);
+
+                    bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(lx, ly + 1, lz, neightbourLevel, currentNode.chunk));
+                    affectedChunks.add(currentNode.chunk);
+                } else if(neightbourLevel >= currentNode.value) {
+                    bfsLightNodeQueue.add(new BFSLightNode(lx, ly + 1, lz, currentNode.chunk));
+                }
+            }
+            if((lz + 1) > 15 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 0, 1)) != null) { //Edge: check another chunk
+                Chunk currChunk = chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 0, 1));
+                int neightbourLevel = currChunk.getBlocklight(lx, ly, 0);
+                if(neightbourLevel != 0 && neightbourLevel < currentNode.value) {
+                    currChunk.setBlocklight(lx, ly, 0, (byte) 0);
+
+                    bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(lx, ly, 0, neightbourLevel, currChunk));
+                    affectedChunks.add(currChunk);
+                } else if(neightbourLevel >= currentNode.value) {
+                    bfsLightNodeQueue.add(new BFSLightNode(lx, ly, 0, currChunk));
+                }
+            } else if((lz + 1) < 16) {
+                int neightbourLevel = currentNode.chunk.getBlocklight(lx , ly, lz + 1);
+                if(neightbourLevel != 0 && neightbourLevel < currentNode.value) {
+                    currentNode.chunk.setBlocklight(lx, ly, lz + 1, (byte) 0);
+
+                    bfsLightRemovalNodeQueue.add(new BFSLightRemovalNode(lx, ly, lz + 1, neightbourLevel, currentNode.chunk));
+                    affectedChunks.add(currentNode.chunk);
+                } else if(neightbourLevel >= currentNode.value) {
+                    bfsLightNodeQueue.add(new BFSLightNode(lx, ly, lz + 1, currentNode.chunk));
+                }
+            }
+        }
+
+        for(Chunk affectedChunk : affectedChunks) {
+            if(!updatingChunk.equals(affectedChunk)) affectedChunk.updateMesh();
+        }
+        affectedChunks.clear();
+    }
+
+    void updateSkyLights(Chunk updatingChunk) {
+        Set<Chunk> affectedChunks = new LinkedHashSet<>();
+
+        boolean hittedVoxel = false;
+        while(!bfsSkyLightNodeQueue.isEmpty()) {
+            BFSLightNode currentNode = bfsSkyLightNodeQueue.poll();
+
+            int lightLevel = currentNode.chunk.getSunlight(currentNode.x, currentNode.y, currentNode.z);
+            int lx = currentNode.x;
+            int ly = currentNode.y;
+            int lz = currentNode.z;
+
+            if((ly - 1) < 0 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, -1, 0)) != null) { //Edge: check another chunk
+                Chunk currChunk = chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, -1, 0));
+                if(blockIsTransparentOrAir(lx, 15, lz, currChunk) && (currChunk.getSunlight(lx, 15, lz) + 2) <= lightLevel) {
+                    //Propagate
+
+                    currChunk.setSunlight(lx, 15, lz, (byte) lightLevel);
+
+                    bfsLightNodeQueue.add(new BFSLightNode(lx, 15, lz, currChunk));
+                    affectedChunks.add(currChunk);
+                } else {
+                    hittedVoxel = true;
+                }
+            } else if((ly - 1) >= 0) {
+                if(blockIsTransparentOrAir(lx, ly - 1, lz, currentNode.chunk) && (currentNode.chunk.getSunlight(lx, ly - 1, lz) + 2) <= lightLevel) {
+                    //Propagate
+
+                    currentNode.chunk.setSunlight(lx, ly - 1, lz, (byte) lightLevel);
+
+                    bfsLightNodeQueue.add(new BFSLightNode(lx, ly - 1, lz, currentNode.chunk));
+                    affectedChunks.add(currentNode.chunk);
+                } else {
+                    hittedVoxel = true;
+                }
+            }
+            if(hittedVoxel) {
+                if ((lx - 1) < 0 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(-1, 0, 0)) != null) { //Edge: check another chunk
+                    Chunk currChunk = chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(-1, 0, 0));
+                    if (blockIsTransparentOrAir(15, ly, lz, currChunk) && (currChunk.getSunlight(15, ly, lz) + 2) <= lightLevel) {
+                        //Propagate
+
+                        currChunk.setSunlight(15, ly, lz, (byte) (lightLevel - 1));
+
+                        bfsLightNodeQueue.add(new BFSLightNode(15, ly, lz, currChunk));
+                        affectedChunks.add(currChunk);
+                    }
+                } else if ((lx - 1) >= 0) {
+                    if (blockIsTransparentOrAir(lx - 1, ly, lz, currentNode.chunk) && (currentNode.chunk.getSunlight(lx - 1, ly, lz) + 2) <= lightLevel) {
+                        //Propagate
+
+                        currentNode.chunk.setSunlight(lx - 1, ly, lz, (byte) (lightLevel - 1));
+
+                        bfsLightNodeQueue.add(new BFSLightNode(lx - 1, ly, lz, currentNode.chunk));
+                        affectedChunks.add(currentNode.chunk);
+                    }
+                }
+                if ((lz - 1) < 0 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 0, -1)) != null) { //Edge: check another chunk
+                    Chunk currChunk = chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 0, -1));
+                    if (blockIsTransparentOrAir(lx, ly, 15, currChunk) && (currChunk.getSunlight(lx, ly, 15) + 2) <= lightLevel) {
+                        //Propagate
+
+                        currChunk.setSunlight(lx, ly, 15, (byte) (lightLevel - 1));
+
+                        bfsLightNodeQueue.add(new BFSLightNode(lx, ly, 15, currChunk));
+                        affectedChunks.add(currChunk);
+                    }
+                } else if ((lz - 1) >= 0) {
+                    if (blockIsTransparentOrAir(lx, ly, lz - 1, currentNode.chunk) && (currentNode.chunk.getSunlight(lx, ly, lz - 1) + 2) <= lightLevel) {
+                        //Propagate
+
+                        currentNode.chunk.setSunlight(lx, ly, lz - 1, (byte) (lightLevel - 1));
+
+                        bfsLightNodeQueue.add(new BFSLightNode(lx, ly, lz - 1, currentNode.chunk));
+                        affectedChunks.add(currentNode.chunk);
+                    }
+                }
+                if ((lx + 1) > 15 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(+1, 0, 0)) != null) { //Edge: check another chunk
+                    Chunk currChunk = chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(+1, 0, 0));
+                    if (blockIsTransparentOrAir(0, ly, lz, currChunk) && (currChunk.getSunlight(0, ly, lz) + 2) <= lightLevel) {
+                        //Propagate
+
+                        currChunk.setSunlight(0, ly, lz, (byte) (lightLevel - 1));
+
+                        bfsLightNodeQueue.add(new BFSLightNode(0, ly, lz, currChunk));
+                        affectedChunks.add(currChunk);
+                    }
+                } else if ((lx + 1) < 16) {
+                    if (blockIsTransparentOrAir(lx + 1, ly, lz, currentNode.chunk) && (currentNode.chunk.getSunlight(lx + 1, ly, lz) + 2) <= lightLevel) {
+                        //Propagate
+
+                        currentNode.chunk.setSunlight(lx + 1, ly, lz, (byte) (lightLevel - 1));
+
+                        bfsLightNodeQueue.add(new BFSLightNode(lx + 1, ly, lz, currentNode.chunk));
+                        affectedChunks.add(currentNode.chunk);
+                    }
+                }
+                if ((lz + 1) > 15 && chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 0, 1)) != null) { //Edge: check another chunk
+                    Chunk currChunk = chunks.get(new Vector3f(currentNode.chunk.chunkPosition).add(0, 0, 1));
+                    if (blockIsTransparentOrAir(lx, ly, 0, currChunk) && (currChunk.getSunlight(lx, ly, 0) + 2) <= lightLevel) {
+                        //Propagate
+
+                        currChunk.setSunlight(lx, ly, 0, (byte) (lightLevel - 1));
+
+                        bfsLightNodeQueue.add(new BFSLightNode(lx, ly, 0, currChunk));
+                        affectedChunks.add(currChunk);
+                    }
+                } else if ((lz + 1) < 16) {
+                    if (blockIsTransparentOrAir(lx, ly, lz + 1, currentNode.chunk) && (currentNode.chunk.getSunlight(lx, ly, lz + 1) + 2) <= lightLevel) {
+                        //Propagate
+
+                        currentNode.chunk.setSunlight(lx, ly, lz + 1, (byte) (lightLevel - 1));
+
+                        bfsLightNodeQueue.add(new BFSLightNode(lx, ly, lz + 1, currentNode.chunk));
+                        affectedChunks.add(currentNode.chunk);
+                    }
+                }
+            }
+        }
+
+        for(Chunk affectedChunk : affectedChunks) {
+            if(!updatingChunk.equals(affectedChunk)) affectedChunk.updateMesh();
+        }
+        affectedChunks.clear();
+    }
+
 }

@@ -64,31 +64,40 @@ public class Chunk extends Mesh {
         //If not, we use the adjacent values - 1
 
         int ourLightningValue = 15;
+        int ourSkyLightningValue = 0;
         if(blockType.isTransparent()) {
             ourLightningValue = getBlocklight((int)blockPos.x, (int)blockPos.y, (int)blockPos.z);
+            ourSkyLightningValue = getSunlight((int)blockPos.x, (int)blockPos.y, (int)blockPos.z);
         }
         else if(getBlocklight((int)blockPos.x, (int)blockPos.y, (int)blockPos.z) != 15) {
             switch(face) {
                 case 0: // X + 1
                     ourLightningValue = getBlocklight((int)blockPos.x + 1, (int)blockPos.y, (int)blockPos.z);
+                    ourSkyLightningValue = getSunlight((int)blockPos.x + 1, (int)blockPos.y, (int)blockPos.z);
                     break;
                 case 1: // X - 1
                     ourLightningValue = getBlocklight((int)blockPos.x - 1, (int)blockPos.y, (int)blockPos.z);
+                    ourSkyLightningValue = getSunlight((int)blockPos.x - 1, (int)blockPos.y, (int)blockPos.z);
                     break;
                 case 2: // Y + 1
                     ourLightningValue = getBlocklight((int)blockPos.x, (int)blockPos.y + 1, (int)blockPos.z);
+                    ourSkyLightningValue = getSunlight((int)blockPos.x, (int)blockPos.y + 1, (int)blockPos.z);
                     break;
                 case 3: // Y - 1
                     ourLightningValue = getBlocklight((int)blockPos.x, (int)blockPos.y - 1, (int)blockPos.z);
+                    ourSkyLightningValue = getSunlight((int)blockPos.x, (int)blockPos.y - 1, (int)blockPos.z);
                     break;
                 case 4: // Z + 1
                     ourLightningValue = getBlocklight((int)blockPos.x, (int)blockPos.y, (int)blockPos.z + 1);
+                    ourSkyLightningValue = getSunlight((int)blockPos.x, (int)blockPos.y, (int)blockPos.z + 1);
                     break;
                 case 5: // Z - 1
                     ourLightningValue = getBlocklight((int)blockPos.x, (int)blockPos.y, (int)blockPos.z - 1);
+                    ourSkyLightningValue = getSunlight((int)blockPos.x, (int)blockPos.y, (int)blockPos.z - 1);
                     break;
             }
         }
+        ourLightningValue = Math.max(ourSkyLightningValue, ourLightningValue);
 
         float[] shadingVals = blockType.getShadingValues()[face];
         for (int i = 0; i < shadingVals.length; i++) this.shadingValues.add(i, (float) (shadingVals[i] * Math.pow(0.8, (15 - ourLightningValue))));
@@ -222,10 +231,37 @@ public class Chunk extends Mesh {
     }
 
     byte getSunlight(int x, int y, int z) {
+        if(x < 0 || x > 15 || y < 0 || y > 15 || z < 0 || z > 15) {
+            int newChunkLx = (x < 0) ? 15 : (x > 15) ? 0 : x;
+            int newChunkLy = (y < 0) ? 15 : (y > 15) ? 0 : y;
+            int newChunkLz = (z < 0) ? 15 : (z > 15) ? 0 : z;
+            int newChunkX = (int) (chunkPosition.x + ((x < 0) ? -1 : (x > 15) ? 1 : 0));
+            int newChunkY = (int) (chunkPosition.y + ((y < 0) ? -1 : (y > 15) ? 1 : 0));
+            int newChunkZ = (int) (chunkPosition.z + ((z < 0) ? -1 : (z > 15) ? 1 : 0));
+
+            Chunk newChunk = world.getChunk(newChunkX, newChunkY, newChunkZ);
+            if(newChunk == null) return 0;
+            return newChunk.getSunlight(newChunkLx, newChunkLy, newChunkLz);
+        }
+
         return (byte) ((Byte.toUnsignedInt(this.lights[x][y][z]) >> 4) & 0xF);
     }
 
     void setSunlight(int x, int y, int z, byte value) {
+        if(x < 0 || x > 15 || y < 0 || y > 15 || z < 0 || z > 15) {
+            int newChunkLx = (x < 0) ? 15 : (x > 15) ? 0 : x;
+            int newChunkLy = (y < 0) ? 15 : (y > 15) ? 0 : y;
+            int newChunkLz = (z < 0) ? 15 : (z > 15) ? 0 : z;
+            int newChunkX = (int) (chunkPosition.x + ((x < 0) ? -1 : (x > 15) ? 1 : 0));
+            int newChunkY = (int) (chunkPosition.y + ((y < 0) ? -1 : (y > 15) ? 1 : 0));
+            int newChunkZ = (int) (chunkPosition.z + ((z < 0) ? -1 : (z > 15) ? 1 : 0));
+
+            Chunk newChunk = world.getChunk(newChunkX, newChunkY, newChunkZ);
+            if(newChunk == null) return;
+            newChunk.setSunlight(newChunkLx, newChunkLy, newChunkLz, value);
+            return;
+        }
+
         this.lights[x][y][z] = (byte) ((Byte.toUnsignedInt(this.lights[x][y][z]) & 0xF) | (value << 4));
     }
 

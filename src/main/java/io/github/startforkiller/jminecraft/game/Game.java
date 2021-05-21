@@ -46,6 +46,8 @@ public class Game implements IGameLogic {
         window.setClearColor(0.5f, 0.7f, 1.0f, 1.0f);
     }
 
+    static int currentBlock = 13;
+
     @Override
     public void input(Window window, MouseInput mouseInput) {
         cameraInc.set(0, 0, 0);
@@ -67,10 +69,17 @@ public class Game implements IGameLogic {
         if(window.isKeyPressed(GLFW_KEY_LEFT_CONTROL)) {
             doubleSpeed = true;
         }
+        if(window.isKeyPressed(GLFW_KEY_KP_ADD)) {
+            currentBlock++;
+            if(instance.world.blockTypes.size() <= currentBlock) currentBlock = 0;
+        }
+        if(window.isKeyPressed(GLFW_KEY_KP_SUBTRACT)) {
+            currentBlock--;
+            if(currentBlock < 0) currentBlock = instance.world.blockTypes.size() - 1;
+        }
     }
 
     static boolean lastClicked = false;
-    static int currentBlock = 7;
 
     public static Integer HitCallback(Vector3f[] blocks) {
         if(instance.mouseInput.isLeftButtonPressed()) {
