@@ -43,7 +43,7 @@ public class Game implements IGameLogic {
         gameItems = new GameItem[] {
         };
 
-        window.setClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        window.setClearColor(0.5f, 0.7f, 1.0f, 1.0f);
     }
 
     @Override
